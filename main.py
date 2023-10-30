@@ -14,11 +14,11 @@ from jobs import job
 
 SRC_DB = os.environ.get(
     "SOURCE_DATABSE",
-    f"dbname={RAW_DB} user=postgres password=techtest host=localhost port=15432",
+    f"dbname=raw user=postgres password=techtest host=localhost port=15432",
 )
 DEST_DB = os.environ.get(
     "DESTINATION_DATABASE",
-    f"dbname={CLEANSED_DB} user=postgres password=techtest host=localhost port=15432",
+    f"dbname=cleansed user=postgres password=techtest host=localhost port=15432",
 )
 SPARK = os.environ.get("SPARK_MASTER", "spark://127.0.1.1:7077")
 
@@ -32,17 +32,15 @@ dest_conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
 def kickoff_job():
     """Given a well-formed payload from a database, kick-off the relevant
     spark job"""
-    raw_conn.poll()
+    src_conn.poll()
 
-    for notify in raw_conn.notifies:
+    for notify in src_conn.notifies:
         payload = json.loads(notify.payload)
         tbl = payload["tbl"]
         _id = payload["id"]
 
         j = job(tbl, src_conn, dest_conn)
         j.read(_id)
-
-        print(j.data)
 
         spark = (
             SparkSession.builder.appName(f"raw_{tbl}_{_id}").master(SPARK).getOrCreate()
@@ -55,13 +53,13 @@ def kickoff_job():
 
         spark.stop()
 
-    raw_conn.notifies.clear()
+    src_conn.notifies.clear()
 
 
 if __name__ == "__main__":
-    cursor = raw_conn.cursor()
+    cursor = src_conn.cursor()
     cursor.execute(f"LISTEN create_or_update_record;")
 
     loop = asyncio.get_event_loop()
-    loop.add_reader(raw_conn, kickoff_job)
+    loop.add_reader(src_conn, kickoff_job)
     loop.run_forever()
