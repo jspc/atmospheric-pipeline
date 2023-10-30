@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '*'
+    tags:
+      - '*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions: read-all
+
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install dependencies
+      uses: VaultVulp/action-pipenv@v2.0.1
+      with:
+        command: install -d
+
+    - name: Lint python app(s)
+      uses: VaultVulp/action-pipenv@v2.0.1
+      with:
+        command: run black --check .
+
+    - name: Test python app(s)
+      uses: VaultVulp/action-pipenv@v2.0.1
+      with:
+        command: run pytest --cov --cov-report term-missing -v
